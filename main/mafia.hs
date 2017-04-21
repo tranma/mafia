@@ -185,7 +185,7 @@ commands =
             (pure MafiaClean)
 
  , command' "build" "Build this package, including all executables and test suites."
-            (MafiaBuild <$> pProfiling <*> pWarnings <*> pCoreDump <*> many pFlag <*> many pCabalArgs)
+            (MafiaBuild <$> pProfiling <*> pMaxBackjumps <*> pWarnings <*> pCoreDump <*> many pFlag <*> many pCabalArgs)
 
  , command' "test" "Test this package, by default this runs all test suites."
             (MafiaTest <$> many pFlag <*> many pCabalArgs)
@@ -251,6 +251,13 @@ pWarnings =
        long "disable-warnings"
     <> short 'w'
     <> help "Disable warnings for this build."
+
+pMaxBackjumps :: Parser MaxBackjumps
+pMaxBackjumps =
+ option (MaxBackjumps <$> auto) $
+       long "max-backjumps"
+    <> short 'j'
+    <> help "Maximum number of backjumps allowed during constraint resolution."
 
 pCoreDump :: Parser CoreDump
 pCoreDump =
@@ -436,9 +443,9 @@ mafiaClean = do
   Out (_ :: ByteString) <- liftCabal $ cabal "clean" []
   liftCabal removeSandbox
 
-mafiaBuild :: Profiling -> Warnings -> CoreDump -> [Flag] -> [Argument] -> EitherT MafiaError IO ()
-mafiaBuild p w dump flags args = do
-  initMafia p flags
+mafiaBuild :: Profiling -> MaxBackjumps -> Warnings -> CoreDump -> [Flag] -> [Argument] -> EitherT MafiaError IO ()
+mafiaBuild p j w dump flags args = do
+  initMafia p j flags
 
   let
     wargs =
@@ -630,15 +637,15 @@ getPackageDatabases = do
   where
     isPackage = ("-packages.conf.d" `T.isSuffixOf`)
 
-initMafia :: Profiling -> [Flag] -> EitherT MafiaError IO ()
-initMafia prof flags = do
+initMafia :: Profiling -> MaxBackjumps -> [Flag] -> EitherT MafiaError IO ()
+initMafia prof jumps flags = do
   -- we just call this for the side-effect, if we can't find a .cabal file then
   -- mafia should fail fast and not polute the directory with a sandbox.
   (_ :: File) <- firstT MafiaCabalError $ getCabalFile =<< getCurrentDirectory
 
   ensureBuildTools
 
-  firstT MafiaInitError $ initialize (Just prof) (Just flags)
+  firstT MafiaInitError $ initialize (Just prof) (Just jumps) (Just flags)
 
   directory <- firstT MafiaCabalError $ getCurrentDirectory
   buildMakefile directory

@@ -10,6 +10,9 @@ module Mafia.Cabal.Types
   , renderFlag
   , parseFlag
 
+  , MaxBackjumps(..)
+  , renderMaxBackjumps
+
   , Package(..)
   , PackageRef(..)
   , SourcePackage(..)
@@ -361,3 +364,12 @@ instance FromJSON SourcePackage where
         o .: "hash"
     _ ->
       mzero
+
+newtype MaxBackjumps =
+  MaxBackjumps {
+    unMaxBackjumps :: Int
+  } deriving (Eq, Show)
+
+renderMaxBackjumps :: MaxBackjumps -> Text
+renderMaxBackjumps =
+  renderIntegral . unMaxBackjumps

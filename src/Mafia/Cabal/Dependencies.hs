@@ -67,9 +67,9 @@ filterPackage name = \case
 
 ------------------------------------------------------------------------
 
-findDependenciesForCurrentDirectory :: [Flag] -> [SourcePackage] -> [Constraint] -> EitherT CabalError IO Package
-findDependenciesForCurrentDirectory flags spkgs constraints = do
-  hoistEither . fromInstallPlan spkgs =<< installPlanForCurrentDirectory flags spkgs constraints
+findDependenciesForCurrentDirectory :: MaxBackjumps -> [Flag] -> [SourcePackage] -> [Constraint] -> EitherT CabalError IO Package
+findDependenciesForCurrentDirectory jumps flags spkgs constraints = do
+  hoistEither . fromInstallPlan spkgs =<< installPlanForCurrentDirectory jumps flags spkgs constraints
 
 findDependenciesForPackage :: PackageName -> [Constraint] -> EitherT CabalError IO Package
 findDependenciesForPackage name constraints = do
@@ -147,8 +147,8 @@ toGraphKey pp = (pp, refId (ppRef pp), ppDeps pp)
 fromGraphKey :: (PackagePlan, PackageId, [PackageId]) -> PackageRef
 fromGraphKey (pp, _, _) = ppRef pp
 
-installPlanForCurrentDirectory :: [Flag] -> [SourcePackage] -> [Constraint] -> EitherT CabalError IO [PackagePlan]
-installPlanForCurrentDirectory flags spkgs constraints0 = do
+installPlanForCurrentDirectory :: MaxBackjumps -> [Flag] -> [SourcePackage] -> [Constraint] -> EitherT CabalError IO [PackagePlan]
+installPlanForCurrentDirectory jumps flags spkgs constraints0 = do
   let
     -- Make sure we can only install the source package by pinning its version
     -- explicitly. This makes cabal fail if the .cabal file would have caused
@@ -165,14 +165,14 @@ installPlanForCurrentDirectory flags spkgs constraints0 = do
       , "--enable-profiling" ]
 
   dir <- getCurrentDirectory
-  makeInstallPlan (Just dir) (fmap spDirectory spkgs) (args <> constraints <> flagArgs)
+  makeInstallPlan jumps (Just dir) (fmap spDirectory spkgs) (args <> constraints <> flagArgs)
 
 installPlanForPackage :: PackageName -> [Constraint] -> EitherT CabalError IO [PackagePlan]
 installPlanForPackage name constraints =
   makeInstallPlan Nothing [] $ [unPackageName name] <> constraintArgs constraints
 
-makeInstallPlan :: Maybe Directory -> [Directory] -> [Argument] -> EitherT CabalError IO [PackagePlan]
-makeInstallPlan mdir sourcePkgs installArgs = do
+makeInstallPlan :: MaxBackjumps -> Maybe Directory -> [Directory] -> [Argument] -> EitherT CabalError IO [PackagePlan]
+makeInstallPlan jumps mdir sourcePkgs installArgs = do
   (_ :: GhcVersion) <- firstT CabalGhcError getGhcVersion -- check ghc is on the path
   checkCabalVersion
 
@@ -190,10 +190,7 @@ makeInstallPlan mdir sourcePkgs installArgs = do
       installDryRun args =
         cabal "install" $
           [ "--reorder-goals"
-            -- 10^4 is an arbitrary "should be enough for anyone" number,
-            -- used rather than -1 to avoid running forever in build scripts
-            -- et cetera.
-          , "--max-backjumps=10000"
+          , "--max-backjumps=" <> renderMaxBackjumps jumps
           , "--avoid-reinstalls"
           , "--dry-run" ] <> installArgs <> args
 

@@ -132,9 +132,9 @@ renderInstallError = \case
 
 ------------------------------------------------------------------------
 
-installDependencies :: Flavour -> [Flag] -> [SourcePackage] -> [Constraint] -> EitherT InstallError IO (Set Package)
-installDependencies flavour flags spkgs constraints = do
-  pkg <- firstT InstallCabalError $ findDependenciesForCurrentDirectory flags spkgs constraints
+installDependencies :: MaxBackjumps -> Flavour -> [Flag] -> [SourcePackage] -> [Constraint] -> EitherT InstallError IO (Set Package)
+installDependencies jumps flavour flags spkgs constraints = do
+  pkg <- firstT InstallCabalError $ findDependenciesForCurrentDirectory jumps flags spkgs constraints
 
   let
     tdeps = transitiveOfPackages (pkgDeps pkg)

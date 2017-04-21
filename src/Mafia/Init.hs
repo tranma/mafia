@@ -76,8 +76,8 @@ renderInitError = \case
 
 ------------------------------------------------------------------------
 
-initialize :: Maybe Profiling -> Maybe [Flag] -> EitherT InitError IO ()
-initialize mprofiling mflags = do
+initialize :: Maybe Profiling -> MaxBackjumps -> Maybe [Flag] -> EitherT InitError IO ()
+initialize mprofiling jumps mflags = do
   firstT InitGitError initSubmodules
 
   sandboxDir <- firstT InitCabalError initSandbox
@@ -126,7 +126,7 @@ initialize mprofiling mflags = do
       else
         fmap (fromMaybe []) . firstT InitLockError $ readLockFile lockFile
 
-    installed <- firstT InitInstallError $ installDependencies flavours flags sdeps constraints
+    installed <- firstT InitInstallError $ installDependencies jumps flavours flags sdeps constraints
 
     -- Note that we filter out source packages. Storing their version in the
     -- constraints file is redundant, as the accessible source code is the only
